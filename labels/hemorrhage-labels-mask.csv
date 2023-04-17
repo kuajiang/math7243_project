@@ -1,4 +1,4 @@
-image,mask,hemorrage_type,shape
+image,mask,hemorrhage_type,shape
 ID_16e2a2520,label_ID_16e2a2520.png,epidural,2
 ID_edeeebfea,label_ID_edeeebfea.png,epidural,2
 ID_accf6a19d,label_ID_accf6a19d.png,epidural,2
