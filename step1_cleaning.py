@@ -7,6 +7,8 @@ from tensorflow.keras.applications.vgg16 import VGG16
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.callbacks import EarlyStopping
+
 
 from common import load_images, split_df
 from common import ALL_HEMORRHAGE_TYPES, ALL_IMAGE_DIRS
@@ -157,9 +159,17 @@ def build_VGG16(n_classes):
 def train_model(model, X_train, y_train, X_val, y_val, epochs, batch_size):
     # Compile the model
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    early_stopping_callback = EarlyStopping(monitor='val_accuracy', patience=10, restore_best_weights=True)
 
     # Train the model on your dataset
-    history = model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(X_val, y_val))
+    history = model.fit(
+        X_train, 
+        y_train, 
+        epochs=epochs, 
+        batch_size=batch_size, 
+        validation_data=(X_val, y_val),
+        callbacks=[early_stopping_callback]
+    )
 
     return history
 
@@ -187,7 +197,6 @@ def train_cleaning_model():
     print("train data shape: ", X_train.shape, y_train.shape)
 
     image_file_paths = ['./renders/%s/brain_window/%s.jpg' % (row['hemorrhage_type'], row['Image']) for _, row in validate_table.iterrows()]
-
     X_val = load_images(image_file_paths)
     y_val = to_categorical(validate_table['shape_type'].values, num_classes=5)
     print("validation data shape: ", X_val.shape, y_val.shape)
