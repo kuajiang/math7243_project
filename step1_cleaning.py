@@ -1,14 +1,15 @@
 import os
 import time
 
+import numpy as np
 import pandas as pd
-import tensorflow as tf
+import pickle
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from tensorflow.keras.models import Model
 from tensorflow.keras.utils import to_categorical
-from tensorflow.keras.callbacks import EarlyStopping
-
 
 from common import load_images, split_df
 from common import ALL_HEMORRHAGE_TYPES, ALL_IMAGE_DIRS
@@ -132,8 +133,6 @@ def save_cleaning_csv():
     count_table = pd.crosstab(table['hemorrhage_type'], table['shape_type'], margins=True, margins_name='Total')
     print(count_table)
 
-import pickle
-
 def build_VGG16(n_classes):
     # Load pre-trained VGG16 model without the top classification layer
     base_model = VGG16(weights='imagenet', include_top=False, input_shape=(224, 224, 3))
@@ -161,7 +160,6 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs, batch_size):
     model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
     early_stopping_callback = EarlyStopping(monitor='val_accuracy', patience=10, restore_best_weights=True)
 
-    # Train the model on your dataset
     history = model.fit(
         X_train, 
         y_train, 
@@ -173,17 +171,10 @@ def train_model(model, X_train, y_train, X_val, y_val, epochs, batch_size):
 
     return history
 
-
-# check_file_exist()
-# read_classify_lable()
-# load_cleaning_filenames()
-# save_cleaning_csv()
-
-
 def train_cleaning_model():
     # read csv file
     table = pd.read_csv('./labels/hemorrhage-labels-cleaning.csv')
-    table = table.sample(n=100, random_state=42)
+    # table = table.sample(n=100, random_state=42)
 
     # split data to train, validation and test
     train_table, validate_table, test_table = split_df(table)
@@ -206,15 +197,15 @@ def train_cleaning_model():
     y_test = to_categorical(test_table['shape_type'].values, num_classes=5)
     print("test data shape: ", X_test.shape, y_test.shape)
 
-    # Build and train the model
+    # build model and train
     model = build_VGG16(5)
     history = train_model(model, X_train, y_train, X_val, y_val, 20, 32)
 
     # save model, add timestamp to the file name
-    model_file_name = './models/cleaning-model-%s.h5' % int(time.time())
+    model_file_name = './models/cleaning-weight-%s.h5' % int(time.time())
     model.save(model_file_name)
     # save history
-    history_file_name = './models/cleaning-model-%s-history.pkl' % int(time.time())
+    history_file_name = './models/cleaning-history-%s.pkl' % int(time.time())
     pickle.dump(history.history, open(history_file_name, 'wb'))
 
     # Evaluate the model on the test data using `evaluate`
@@ -222,4 +213,52 @@ def train_cleaning_model():
     results = model.evaluate(X_test, y_test, batch_size=32)
     print('test loss, test acc:', results)
 
+def test_model():
+    # read csv file
+    table = pd.read_csv('./labels/hemorrhage-labels-cleaning.csv')
+
+    # split data to train, validation and test
+    _, _, test_table = split_df(table)
+
+    # load images
+    image_file_paths = ['./renders/%s/brain_window/%s.jpg' % (row['hemorrhage_type'], row['Image']) for _, row in test_table.iterrows()]
+    X_test = load_images(image_file_paths)
+    # convert shape_type column to one-hot labels
+    y_test = test_table['shape_type'].values
+    print("test data shape: ", X_test.shape, y_test.shape)
+
+    model = build_VGG16(5)
+    model.load_weights('./models/cleaning-1681785936-weight.h5')
+    # Evaluate the model on the test data using `evaluate`
+    print('Evaluate on test data')
+    y_predict = model.predict(X_test)
+    y_predict = np.argmax(y_predict, axis=1)
+    
+    # Calculate accuracy
+    accuracy = accuracy_score(y_test, y_predict)
+    print(f'Accuracy: {accuracy:.2f}')
+
+    # Calculate macro-averaged precision
+    precision = precision_score(y_test, y_predict, average='macro')
+    print(f'Macro-averaged Precision: {precision:.2f}')
+
+    # Calculate macro-averaged recall
+    recall = recall_score(y_test, y_predict, average='macro')
+    print(f'Macro-averaged Recall: {recall:.2f}')
+
+    # Calculate macro-averaged F1 score
+    f1 = f1_score(y_test, y_predict, average='macro')
+    print(f'Macro-averaged F1 Score: {f1:.2f}')
+
+
+
+
+# prepare data
+check_file_exist()
+read_classify_lable()
+load_cleaning_filenames()
+save_cleaning_csv()
+# train model
 train_cleaning_model()
+# test model
+test_model()
