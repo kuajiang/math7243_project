@@ -1,15 +1,21 @@
-import numpy as np
-import pandas as pd
-from sklearn.model_selection import train_test_split
-
-import tensorflow as tf
-from tensorflow.keras.applications import MobileNetV2
-import matplotlib.pyplot as plt
-from PIL import Image
-import pickle
-
 import os
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from PIL import Image
+import pickle
+from sklearn.model_selection import train_test_split
+import tensorflow as tf
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.utils import plot_model
+from tensorflow.keras.utils import Sequence
+from tensorflow.keras.callbacks import EarlyStopping
+
+
+import common
+
+RANDOM_SEED = 255
 
 EXPECT_IMAGE_SIZE = (224, 224)
 EXPECT_IMAGE_SHAPE = (224, 224, 3)
@@ -53,6 +59,46 @@ def unet_mobilenetv2(input_shape=EXPECT_IMAGE_SHAPE, num_classes=1):
     model = tf.keras.Model(inputs=encoder.input, outputs=output)
 
     return model
+
+
+class DataGenerator(Sequence):
+    def __init__(self, df, batch_size=8, shuffle=True):
+        self.df = df
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.on_epoch_end()
+
+    def __len__(self):
+        return int(np.ceil(len(self.df) / self.batch_size))
+
+    def __getitem__(self, index):
+        start = index * self.batch_size
+        end = (index + 1) * self.batch_size
+        indexes = self.indexes[start:end]
+
+        batch_df = self.df.iloc[indexes]
+        
+        batch_images = []
+        batch_masks = []
+        for _, row in batch_df.iterrows():
+            image_file = "./renders/%s/brain_window/%s.jpg" % (row['hemorrhage_type'], row['image'])
+            mask_file = "./seg-label/%s/%s" % (row['hemorrhage_type'], row['mask'])
+            image = load_image(image_file)
+            mask = read_mask_file(mask_file)
+
+            batch_images.append(image)
+            batch_masks.append(mask)
+
+        X = np.array(batch_images, dtype=np.float32)
+        y = np.array(batch_masks, dtype=np.float32)
+
+        return X, y
+
+    def on_epoch_end(self):
+        self.indexes = np.arange(len(self.df))
+        if self.shuffle:
+            np.random.shuffle(self.indexes)
+
 
 
 def load_image(path, img_size=EXPECT_IMAGE_SIZE):
@@ -165,43 +211,70 @@ def prepare_mask_table():
 
 def train_model_seg():
     # Load the data
+    df = pd.read_csv('./labels/hemorrhage-labels-mask.csv')
+    print("total records: ", len(df))
+    common.stat_shape(df)
+    
 
-    images, masks = load_image_mask_all()
+    # images, masks = load_image_mask_all()
 
-    images = np.array(images)
-    masks = np.array(masks)
+    # images = np.array(images)
+    # masks = np.array(masks)
 
-    print(images.shape, masks.shape)
+    # print(images.shape, masks.shape)
 
     # Split the data
-    train_ratio = 0.7
-    test_ratio = 0.2
+    train_ratio = 0.8
+    test_ratio = 0.1
     val_ratio = 0.1    
-    X_train, X_temp, y_train, y_temp = train_test_split(
-        images, 
-        masks, 
-        test_size=(test_ratio + val_ratio), 
-        random_state=255)
-    X_test, X_val, y_test, y_val = train_test_split(
-        X_temp, y_temp, 
-        test_size=(val_ratio / (test_ratio + val_ratio)),
-        random_state=255)
+
+    test_df = df.sample(frac=0.1, random_state=RANDOM_SEED)
+    remain_df = df.drop(test_df.index)
+    train_df = remain_df.sample(frac=0.8, random_state=RANDOM_SEED)
+    valid_df = remain_df.drop(train_df.index)
+
+    # X_train, X_temp, y_train, y_temp = train_test_split(
+    #     images, 
+    #     masks, 
+    #     test_size=(test_ratio + val_ratio), 
+    #     random_state=255)
+    # X_test, X_val, y_test, y_val = train_test_split(
+    #     X_temp, y_temp, 
+    #     test_size=(val_ratio / (test_ratio + val_ratio)),
+    #     random_state=255)
 
     # Create the U-Net model with MobileNetV2 encoder
     model = unet_mobilenetv2(input_shape=EXPECT_IMAGE_SHAPE, num_classes=1)
-    model.summary()
+    # model.summary()
 
     # Compile the model
     model.compile(optimizer=tf.keras.optimizers.Adam(learning_rate=1e-4),
-              loss='binary_crossentropy',
-              metrics=['accuracy'])
+                loss='binary_crossentropy',
+                # metrics=[metric_fun])
+                metrics=['accuracy'])
 
     # Train the model
     epochs = 20
     batch_size = 32
 
-    history = model.fit(X_train, y_train, validation_data=(X_val, y_val),
-                        epochs=epochs, batch_size=batch_size)
+
+    # Create data generators for training and validation data
+    train_generator = DataGenerator(train_df, batch_size=64)
+    val_generator = DataGenerator(valid_df, batch_size=64)
+
+    early_stopping_callback = EarlyStopping(monitor='val_accuracy', patience=5, restore_best_weights=True)
+
+
+    # Train the model using the data generators
+    history = model.fit(
+        train_generator,
+        epochs=30,
+        validation_data=val_generator,
+        callbacks=[early_stopping_callback]
+    )
+
+    # history = model.fit(X_train, y_train, validation_data=(X_val, y_val),
+    #                     epochs=epochs, batch_size=batch_size)
 
     # Save the model:
     model.save('./models/seg_unet.h5')
@@ -236,20 +309,20 @@ def evaluate_model_seg():
 
         plt.subplot(1, 3, 1)
         plt.title("Image")
-        plt.imshow(images[i])
+        plt.imshow(images[i]/255.0)
 
         plt.subplot(1, 3, 2)
         plt.title("Mask")
-        plt.imshow(masks[i])
+        plt.imshow(masks[i]/255.0)
 
         plt.subplot(1, 3, 3)
         plt.title("Predicted mask")
-        plt.imshow(y_pred[i])
+        plt.imshow(y_pred[i]/255.0)
 
         plt.show()
 
 
 # prepare_mask_table()
-# train_model_seg()
+train_model_seg()
 
-evaluate_model_seg()
+# evaluate_model_seg()
