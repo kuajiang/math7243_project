@@ -32,7 +32,7 @@ class ClassifyDataGenerator(Sequence):
         return load_image_data_by_df(batch_df, self.input_shape, self.label_fields)
 
 
-def train_model_by_flow(model, train_df, valid_df):
+def train_model(model, train_df, valid_df):
     batch_size = 64
 
     train_generator = ClassifyDataGenerator(train_df, batch_size, IMAGE_SHAPE, ALL_HEMORRHAGE_TYPES)
@@ -87,6 +87,11 @@ def multilabel_mobilenet(num_classes):
     return model
 
 def train_classify(data_cleaning=False):
+    """Train a multilabel classification model to classify hemorrhage types
+    
+    Arguments:
+        data_cleaning {bool} -- whether to clean the data, default is False
+    """
     df = pd.read_csv('./labels/hemorrhage-labels-shape.csv')
     print("total records: ", len(df))
     stat_shape(df)
@@ -107,11 +112,16 @@ def train_classify(data_cleaning=False):
     model = multilabel_mobilenet(len(ALL_HEMORRHAGE_TYPES))
 
     # train model
-    train_model_by_flow(model, train_df, valid_df)
+    train_model(model, train_df, valid_df)
 
 
 
 def test_model(shape_list=[2]):
+    """Test the model with test data
+
+    Arguments:
+        shape_list {list} -- the shape list to test, default is [2]
+    """
     df = pd.read_csv('./labels/hemorrhage-labels-shape.csv')
     print("total records: ", len(df))
     stat_shape(df)

@@ -107,13 +107,13 @@ def checkphoto(table, image_file_name):
             ylabel = [p['y']*512 for p in points]
             plt.scatter(xlabel, ylabel,marker='.',linewidths=0.5)
     # save labeled image
-    target_file = './labelled/%s/%s_labelled.jpg' % (hemorrhage_type, image_name)
-    plt.savefig(target_file)
+    target_file = './seg-label/%s/%s_labelled.jpg' % (hemorrhage_type, image_name)
+    # plt.savefig(target_file)
     print(target_file)
     # release memory
-    plt.close()
+    # plt.close()
 
-    # plt.show()
+    plt.show()
 
 # read lable data
 # set hemorrhage_type
@@ -182,12 +182,12 @@ def check_file_exists(table):
 
 def main():
     # prepare date for calssification
-    table = read_classify_lable()
-    check_file_exists(table)
-    return
+    # table = read_classify_lable()
+    # check_file_exists(table)
+    # return
 
     # do classification
-    table = pd.read_csv('./labels/hemorrhage-labels-exist.csv')
+    # table = pd.read_csv('./labels/hemorrhage-labels-exist.csv')
     
 
 
@@ -200,13 +200,15 @@ def main():
     # image_name = 'ID_1332d87fa.jpg'
     # checkphoto(table, image_name)
 
-    for _, row in table.iterrows():
-        checkphoto(table, row['Origin'])
+    # for _, row in table.iterrows():
+        # checkphoto(table, row['Origin'])
     
     # random_rows = table.sample(n=10)
     # for _, row in random_rows.iterrows():
         # checkphoto(table, row['Origin'])
     # checkphoto(table, 'ID_00eb6f7cc.jpg')
+    checkphoto(table, 'ID_3a4e45124.jpg')
+
 
 if __name__ == '__main__':
     main()
