@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import pickle
+import tensorflow as tf
 from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import GlobalAveragePooling2D, Dense
@@ -12,7 +13,7 @@ from tensorflow.keras.utils import Sequence
 
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 
-from common import load_image_data_by_df, stat_shape
+from common import stat_shape
 from common import IMAGE_SHAPE, ALL_HEMORRHAGE_TYPES, RANDOM_SEED
 
 class ClassifyDataGenerator(Sequence):
@@ -23,14 +24,26 @@ class ClassifyDataGenerator(Sequence):
         self.label_fields = label_fields
 
     def __len__(self):
-        # print("get len", int(np.ceil(len(self.df) / float(self.batch_size))))
         return int(np.ceil(len(self.df) / float(self.batch_size)))
 
     def __getitem__(self, idx):
         batch_df = self.df.iloc[idx * self.batch_size:(idx + 1) * self.batch_size]
 
-        return load_image_data_by_df(batch_df, self.input_shape, self.label_fields)
 
+        images = np.zeros((len(batch_df), *self.input_shape))
+        labels = np.zeros((len(batch_df), len(self.label_fields)))
+    
+        for index, (_, row) in enumerate(batch_df.iterrows()):
+            image_file = "./renders/%s/brain_window/%s.jpg" % (row['hemorrhage_type'], row['Image'])
+        
+            img = tf.keras.preprocessing.image.load_img(image_file, target_size=input_shape[0:2])
+            img_array = tf.keras.preprocessing.image.img_to_array(img)
+
+
+            images[index] = img_array/255.0
+            labels[index] = row[self.label_fields]
+
+        return images, labels
 
 def train_model(model, train_df, valid_df):
     batch_size = 64

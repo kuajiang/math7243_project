@@ -252,13 +252,15 @@ def test_model():
 
 
 
-
-# prepare data
-check_file_exist()
-read_classify_lable()
-load_cleaning_filenames()
-save_cleaning_csv()
-# train model
-train_cleaning_model()
-# test model
-test_model()
+if __name__ == "__main__":
+    # prepare data
+    check_file_exist()
+    read_classify_lable()
+    load_cleaning_filenames()
+    save_cleaning_csv()
+    
+    # train model
+    train_cleaning_model()
+    
+    # test model
+    test_model()

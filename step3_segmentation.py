@@ -186,7 +186,7 @@ class DataGenerator(Sequence):
 def load_image(path, img_size=IMAGE_SHAPE):
     img = tf.keras.preprocessing.image.load_img(path, target_size=img_size[0:2])
     img_array = tf.keras.preprocessing.image.img_to_array(img)
-    return img_array
+    return img_array/255.0
 
 
 
@@ -271,7 +271,7 @@ def train_model_seg():
     stat_shape(df)
 
     # Split the data
-    test_df = df.sample(frac=0.1, random_state=RANDOM_SEED)
+    test_df = df.sample(frac=0.2, random_state=RANDOM_SEED)
     remain_df = df.drop(test_df.index)
     train_df = remain_df.sample(frac=0.8, random_state=RANDOM_SEED)
     valid_df = remain_df.drop(train_df.index)
@@ -341,11 +341,11 @@ def evaluate_model_seg():
 
         plt.subplot(1, 3, 2)
         plt.title("Mask")
-        plt.imshow(masks[i]/255.0)
+        plt.imshow(masks[i])
 
         plt.subplot(1, 3, 3)
         plt.title("Predicted mask")
-        plt.imshow(y_pred[i]/255.0)
+        plt.imshow(y_pred[i])
 
         plt.show()
 
