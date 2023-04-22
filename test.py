@@ -169,8 +169,8 @@ def select_random_test_image():
 
 # main
 if __name__ == "__main__":
-    select_test_images()
-    exit(0)
+    # select_test_images()
+
     # read image name from command line
     if len(sys.argv) < 2:
         image_name = select_random_test_image()
@@ -179,4 +179,3 @@ if __name__ == "__main__":
         image_name = sys.argv[1]
 
     test_image(image_name)
-
